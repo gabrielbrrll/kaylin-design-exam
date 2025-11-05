@@ -1,8 +1,4 @@
 # Content Calendar Management System Design
-yes,
-## Question 1: How would you design a system that manages the user content that populates our calendar each month?
-
----
 
 ## Problem Statement
 
