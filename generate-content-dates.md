@@ -1,9 +1,3 @@
-# Exam Questions - Answers
-
----
-
-## Question 2: How do you handle multiple billing cycle lengths? (Quarterly / monthly)
-
 ### How We Handle Different Billing Cycles
 
 The `client_subscriptions` table stores `billing_cycle` (monthly/quarterly/annual) and dynamically calculates cycle boundaries. Each cycle type has its own quota and date range. A daily cron job checks for cycle expiration and resets `content_used_this_cycle` to 0 when a new cycle begins. See [design.md](./design.md) for schema details.
