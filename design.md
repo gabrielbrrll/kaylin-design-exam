@@ -122,6 +122,8 @@ CREATE TABLE client_subscriptions (
 CREATE INDEX idx_client_subscription ON client_subscriptions(client_id);
 CREATE INDEX idx_next_billing ON client_subscriptions(next_billing_date)
     WHERE subscription_status = 'active';
+CREATE INDEX idx_cycle_end ON client_subscriptions(current_cycle_end)
+    WHERE subscription_status = 'active';
 ```
 
 **Key Fields:**
@@ -249,6 +251,36 @@ UPDATE client_subscriptions
 SET content_used_this_cycle = content_used_this_cycle + 1
 WHERE client_id = 'client-123';
 -- Now: used=6, quota=30
+
+COMMIT;
+```
+
+**Multi-Platform Distribution Example:**
+
+Allocating the same content to multiple platforms (Instagram, Facebook, Twitter) counts as **1 credit**:
+
+```sql
+BEGIN;
+
+-- Check quota with lock
+SELECT content_used_this_cycle, content_quota_per_cycle
+FROM client_subscriptions
+WHERE client_id = 'client-123'
+FOR UPDATE;
+-- Returns: used=5, quota=30
+
+-- Allocate same content to 3 platforms (3 rows, same content_id)
+INSERT INTO content_allocations (client_id, content_id, scheduled_date, billing_cycle_id, platform)
+VALUES
+    ('client-123', 'content-042', '2025-01-15', 'client-123-2025-01', 'instagram'),
+    ('client-123', 'content-042', '2025-01-15', 'client-123-2025-01', 'facebook'),
+    ('client-123', 'content-042', '2025-01-15', 'client-123-2025-01', 'twitter');
+
+-- Increment quota ONCE (1 content = 1 credit, regardless of platforms)
+UPDATE client_subscriptions
+SET content_used_this_cycle = content_used_this_cycle + 1
+WHERE client_id = 'client-123';
+-- Now: used=6, quota=30 (not 8!)
 
 COMMIT;
 ```
@@ -412,7 +444,9 @@ SET current_cycle_start = '2025-02-01',
 ✅ **Track allocations:** Query "what content did client X get in January?"
 ```sql
 SELECT COUNT(*) FROM content_allocations
-WHERE client_id = 'client-123' AND billing_cycle_id = 'client-123-2025-01';
+WHERE client_id = 'client-123'
+  AND billing_cycle_id = 'client-123-2025-01'
+  AND is_fallback = false;  -- Exclude fallback content (doesn't count toward quota)
 ```
 
 ✅ **Load calendar:** Show all posts for date range

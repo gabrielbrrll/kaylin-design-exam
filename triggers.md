@@ -89,7 +89,7 @@ for (const sub of expiredCycles) {
 -- Find accounts with expired grace periods (grace period extends through end of day)
 UPDATE client_subscriptions
 SET subscription_status = 'suspended'
-WHERE grace_period_end_date < CURRENT_DATE
+WHERE grace_period_end_date <= CURRENT_DATE
   AND payment_status = 'failed'
   AND subscription_status = 'active';
 
@@ -203,6 +203,7 @@ stripe.webhooks.on('invoice.payment_failed', async (event) => {
 
 **Logic:**
 ```javascript
+// Note: Wrapped in transaction with FOR UPDATE lock - see design.md line 237
 async function requestContent(clientId, scheduledDate) {
     const sub = await getSubscription(clientId);
 
@@ -273,7 +274,7 @@ async function autoScheduleContent(clientId, params) {
 
     // Check payment status + quota
     if (sub.payment_status === 'failed') throw new Error('Payment failed.');
-    if (sub.content_used_this_cycle + params.count > sub.content_quota_per_cycle) {
+    if (sub.content_used_this_cycle + params.count >= sub.content_quota_per_cycle) {
         throw new Error('Not enough quota');
     }
 
